@@ -1,3 +1,4 @@
+import { RAPID_API_KEY } from "../env/keys";
 import { sanitizeWorkoutName } from "../functions/santizeWorkoutName";
 
 export class WorkoutController {
