@@ -5,7 +5,7 @@ export class GenerationController {
         try {
             const response = await ollama.chat({
                 model: 'mistral',
-                messages: [{ role: 'user', content: prompt + '. Give only an array of workouts, that include a name: and either duration: in seconds or the number of rpes:. Return JSON' }],
+                messages: [{ role: 'user', content: prompt + '. Give only an array of workouts, that include a name: and either duration: (in seconds) OR the number of reps: and sets: Return JSON' }],
             })
             return response.message.content
         } catch (error) {
