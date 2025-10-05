@@ -1,21 +1,22 @@
-import ollama from 'ollama'
-import { WorkoutRequest } from '../models/user.model'
-import { UserService } from '../services/user.service'
+import { Ollama } from 'ollama';
+import { WorkoutRequest } from '../models/user.model';
+import { UserService } from '../services/user.service';
 
 export class GenerationController {
     static async generateWorkout(prompt: string) {
         try {
-            const response = await ollama.chat({
-                model: 'mistral',
+            const ollamaClient = new Ollama({ host: 'http://192.168.0.3:11434' });
+            const response = await ollamaClient.chat({
+                model: 'gemma3:12b',
                 messages: [{ role: 'user', content: prompt + '. Give only an array of workouts, that include a name: and either duration: (in seconds) OR the number of reps: and sets: Return JSON' }],
-            })
-            return response.message.content
+            });
+            return response.message.content;
         } catch (error) {
-            console.error('Error generating workout:', error)
+            console.error('Error generating workout:', error);
             return {
                 success: false,
                 message: 'Failed to generate workout'
-            }
+            };
         }
     }
 
@@ -30,8 +31,9 @@ export class GenerationController {
             // Build context-aware prompt
             const contextualPrompt = this.buildContextualPrompt(workoutRequest, userProfile);
 
-            const response = await ollama.chat({
-                model: 'mistral',
+            const ollamaClient = new Ollama({ host: 'http://192.168.0.3:11434' });
+            const response = await ollamaClient.chat({
+                model: 'gemma3:12b',
                 messages: [{
                     role: 'user',
                     content: contextualPrompt
