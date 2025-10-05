@@ -1,5 +1,6 @@
 import { Ollama } from 'ollama';
 import { WorkoutRequest } from '../models/user.model';
+import { SmartWorkoutResponse } from '../models/workout.model';
 import { UserService } from '../services/user.service';
 
 export class GenerationController {
@@ -20,7 +21,7 @@ export class GenerationController {
         }
     }
 
-    static async generateSmartWorkout(workoutRequest: WorkoutRequest) {
+    static async generateSmartWorkout(workoutRequest: WorkoutRequest): Promise<SmartWorkoutResponse> {
         try {
             // Get user profile if userId is provided
             let userProfile = null;
