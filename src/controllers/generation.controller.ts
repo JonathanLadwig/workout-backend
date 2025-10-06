@@ -8,7 +8,7 @@ export class GenerationController {
         try {
             const ollamaClient = new Ollama({ host: 'http://192.168.0.3:11434' });
             const response = await ollamaClient.chat({
-                model: 'gemma3:12b',
+                model: 'mistral-nemo:latest',
                 messages: [{ role: 'user', content: prompt + '. Give only an array of workouts, that include a name: and either duration: (in seconds) OR the number of reps: and sets: Return JSON' }],
             });
             return response.message.content;
@@ -34,7 +34,7 @@ export class GenerationController {
 
             const ollamaClient = new Ollama({ host: 'http://192.168.0.3:11434' });
             const response = await ollamaClient.chat({
-                model: 'gemma3:12b',
+                model: 'mistral-nemo:latest',
                 messages: [{
                     role: 'user',
                     content: contextualPrompt
