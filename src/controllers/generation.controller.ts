@@ -23,26 +23,57 @@ export class GenerationController {
 
     static async generateSmartWorkout(workoutRequest: WorkoutRequest): Promise<SmartWorkoutResponse> {
         try {
-            // Get user profile if userId is provided
             let userProfile = null;
             if (workoutRequest.userId) {
                 userProfile = await UserService.getUserProfile(workoutRequest.userId);
             }
 
-            // Build context-aware prompt
+            console.log('Starting workout generation with request');
+
             const contextualPrompt = this.buildContextualPrompt(workoutRequest, userProfile);
 
+            console.log('Contextual Prompt:');
+            console.log(contextualPrompt);
+
             const ollamaClient = new Ollama({ host: 'http://192.168.0.3:11434' });
+
+            // Define JSON schema for structured output
+            const workoutSchema = {
+                type: "array",
+                items: {
+                    type: "object",
+                    required: ["name", "type", "targetMuscles", "equipment", "instructions", "restPeriod", "difficulty"],
+                    properties: {
+                        name: { type: "string" },
+                        type: { type: "string", enum: ["strength", "cardio", "flexibility"] },
+                        targetMuscles: { type: "array", items: { type: "string" } },
+                        equipment: { type: "string" },
+                        instructions: { type: "array", items: { type: "string" } },
+                        sets: { type: "number" },
+                        reps: { type: "number" },
+                        duration: { type: "number" },
+                        restPeriod: { type: "number" },
+                        difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"] }
+                    }
+                }
+            };
+
             const response = await ollamaClient.chat({
                 model: 'mistral-nemo:latest',
                 messages: [{
                     role: 'user',
                     content: contextualPrompt
                 }],
+                format: workoutSchema, // Pass schema instead of just 'json'
+                options: {
+                    temperature: 0.3,
+                }
             });
 
-            // Parse the JSON response from the AI
-            const workoutData = this.parseWorkoutResponse(response.message.content);
+            console.log('Raw response from Ollama:');
+            console.log(response.message.content);
+
+            const workoutData = JSON.parse(response.message.content);
 
             return {
                 success: true,
@@ -64,96 +95,13 @@ export class GenerationController {
         }
     }
 
-    private static parseWorkoutResponse(responseContent: string): any[] {
-        try {
-            // Clean the response to extract JSON
-            let jsonString = responseContent.trim();
-
-            // Remove any markdown code block markers
-            jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-
-            // Find JSON array in the response
-            const jsonStart = jsonString.indexOf('[');
-            const jsonEnd = jsonString.lastIndexOf(']') + 1;
-
-            if (jsonStart !== -1 && jsonEnd > jsonStart) {
-                jsonString = jsonString.substring(jsonStart, jsonEnd);
-            }
-
-            // Parse the JSON
-            const workoutArray = JSON.parse(jsonString);
-
-            // Validate it's an array
-            if (!Array.isArray(workoutArray)) {
-                throw new Error('Response is not an array');
-            }
-
-            return workoutArray;
-        } catch (error) {
-            console.error('Failed to parse workout JSON:', error);
-            console.error('Raw response:', responseContent);
-
-            // Return a fallback workout if parsing fails
-            return this.getFallbackWorkout();
-        }
-    }
-
-    private static getFallbackWorkout(): any[] {
-        return [
-            {
-                "name": "Push-ups",
-                "type": "strength",
-                "targetMuscles": ["chest", "triceps"],
-                "equipment": "body weight",
-                "instructions": [
-                    "Start in a plank position with hands slightly wider than shoulders",
-                    "Lower your chest towards the floor",
-                    "Push back up to starting position"
-                ],
-                "sets": 3,
-                "reps": 10,
-                "restPeriod": 60,
-                "difficulty": "beginner"
-            },
-            {
-                "name": "Bodyweight Squats",
-                "type": "strength",
-                "targetMuscles": ["legs", "glutes"],
-                "equipment": "body weight",
-                "instructions": [
-                    "Stand with feet shoulder-width apart",
-                    "Lower down as if sitting in a chair",
-                    "Return to standing position"
-                ],
-                "sets": 3,
-                "reps": 15,
-                "restPeriod": 60,
-                "difficulty": "beginner"
-            },
-            {
-                "name": "Plank",
-                "type": "strength",
-                "targetMuscles": ["core"],
-                "equipment": "body weight",
-                "instructions": [
-                    "Start in push-up position",
-                    "Hold body in straight line",
-                    "Engage core muscles"
-                ],
-                "duration": 30,
-                "restPeriod": 60,
-                "difficulty": "beginner"
-            }
-        ];
-    }
-
     private static buildContextualPrompt(request: WorkoutRequest, userProfile: any): string {
         const fitnessLevel = request.fitnessLevel || userProfile?.fitnessLevel || 'beginner';
         const duration = request.duration || userProfile?.workoutDuration || 30;
         const equipment = request.equipment || userProfile?.availableEquipment || ['body weight'];
         const intensity = request.intensity || 'medium';
 
-        let prompt = `Generate a ${request.workoutType} workout for a ${fitnessLevel} fitness level person.
+        let prompt = `You are a fitness expert. Generate a ${request.workoutType} workout for a ${fitnessLevel} fitness level person.
 
 Workout Requirements:
 - Target muscle groups: ${request.muscleGroups.join(', ')}
@@ -231,23 +179,16 @@ Mixed Workout:
         }
 
         prompt += `
-Return the workout as a JSON array with this exact structure:
-[
-  {
-    "name": "Exercise Name",
-    "type": "strength|cardio|flexibility",
-    "targetMuscles": ["muscle1", "muscle2"],
-    "equipment": "required equipment",
-    "instructions": ["step 1", "step 2", "step 3"],
-    "sets": number (for strength exercises),
-    "reps": number (for strength exercises),
-    "duration": number in seconds (for cardio/flexibility),
-    "restPeriod": number in seconds,
-    "difficulty": "beginner|intermediate|advanced"
-  }
-]
 
-Make sure the workout is appropriate for the ${fitnessLevel} level and uses only the available equipment: ${equipment.join(', ')}.`;
+Rules:
+- For strength exercises: include "sets" and "reps" as numbers
+- For cardio/flexibility exercises: include "duration" as number in seconds
+- Always include "restPeriod" as number in seconds
+- "instructions" must be an array of strings (at least 2-3 steps)
+- "targetMuscles" must be an array of strings
+- Return ONLY the JSON array, nothing else
+
+Make sure the workout is appropriate for ${fitnessLevel} level using: ${equipment.join(', ')}.`;
 
         return prompt;
     }
